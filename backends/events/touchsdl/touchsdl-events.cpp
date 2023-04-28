@@ -27,6 +27,7 @@
 
 #include "backends/events/touchsdl/touchsdl-events.h"
 #include "backends/platform/sdl/sdl.h"
+#include "backends/timer/default/default-timer.h"
 #include "engines/engine.h"
 
 #include "common/util.h"
@@ -34,10 +35,6 @@
 #include "common/config-manager.h"
 
 #include "math.h"
-
-// TODO - Auto-detect this?
-#define TOUCHSCREEN_WIDTH 640
-#define TOUCHSCREEN_HEIGHT 480
 
 TouchEventSource::TouchEventSource() {
 	for (int port = 0; port < SCE_TOUCH_PORT_MAX_NUM; port++) {

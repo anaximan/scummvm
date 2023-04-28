@@ -20,9 +20,15 @@
  */
 
 #if !defined(DISABLE_DEFAULT_EVENTMANAGER)
+#ifndef BACKEND_EVENTS_TOUCH_H
 #define BACKEND_EVENTS_TOUCH_H
 
 #include "backends/events/sdl/sdl-events.h"
+
+// TODO - Autodetect these values?
+#define SCE_TOUCH_PORT_MAX_NUM 1
+#define TOUCHSCREEN_WIDTH 640
+#define TOUCHSCREEN_HEIGHT 480
 
 /**
  * SDL Events manager for various touch screens.
@@ -75,3 +81,4 @@ private:
 };
 
 #endif /* BACKEND_EVENTS_TOUCH_H */
+#endif 

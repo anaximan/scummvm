@@ -41,6 +41,9 @@
 #endif
 
 #include "backends/events/default/default-events.h"
+#if defined(USE_TOUCHSCREEN)
+#include "backends/events/touchsdl/touchsdl-events.h"
+#endif
 #include "backends/events/sdl/legacy-sdl-events.h"
 #include "backends/keymapper/hardware-input.h"
 #include "backends/mutex/sdl/sdl-mutex.h"
@@ -224,10 +227,16 @@ void OSystem_SDL::initBackend() {
 	detectAntiAliasingSupport();
 #endif
 
+#if defined(USE_TOUCHSCREEN)
+    // Create the touch event source
+	if (!_eventSource)
+		_eventSource = new TouchEventSource();
+#else
 	// Create the default event source, in case a custom backend
 	// manager didn't provide one yet.
 	if (!_eventSource)
 		_eventSource = new SdlEventSource();
+#endif
 
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
 	// SDL 1 does not generate its own keyboard repeat events.

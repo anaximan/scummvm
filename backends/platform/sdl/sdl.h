@@ -36,6 +36,10 @@
 class DiscordPresence;
 #endif
 
+#if defined(USE_TOUCHSCREEN)
+#include "backends/events/touchsdl/touchsdl-events.h"
+#endif
+
 /**
  * Base OSystem class for all SDL ports.
  */
