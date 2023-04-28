@@ -23,6 +23,8 @@
 
 #if defined(USE_TOUCHSCREEN)
 
+#warning Using experimental TouchScreen support!
+
 #include "backends/events/touchsdl/touchsdl-events.h"
 #include "backends/platform/sdl/sdl.h"
 #include "engines/engine.h"
@@ -66,6 +68,7 @@ TouchEventSource::TouchEventSource() {
 }
 
 bool TouchEventSource::pollEvent(Common::Event &event) {
+    ((DefaultTimerManager *) g_system->getTimerManager())->handler();
 	finishSimulatedMouseClicks();
 	return SdlEventSource::pollEvent(event);
 }
@@ -109,7 +112,7 @@ void TouchEventSource::preprocessFingerDown(SDL_Event *event) {
 	int x = _mouseX;
 	int y = _mouseY;
 
-	if (port == 0 && !ConfMan.getBool("panel_touchpad_mode")) {
+	if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
 		convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 	}
 
@@ -160,8 +163,8 @@ void TouchEventSource::preprocessFingerUp(SDL_Event *event) {
 				if ((event->tfinger.timestamp - _finger[port][i].timeLastDown) <= MAX_TAP_TIME) {
 					// short (<MAX_TAP_TIME ms) tap is interpreted as right/left mouse click depending on # fingers already down
 					// but only if the finger hasn't moved since it was pressed down by more than MAX_TAP_MOTION_DISTANCE pixels
-					float xrel = ((event->tfinger.x * 960.0) - (_finger[port][i].lastDownX * 960.0));
-					float yrel = ((event->tfinger.y * 544.0) - (_finger[port][i].lastDownY * 544.0));
+					float xrel = ((event->tfinger.x * static_cast<float>(TOUCHSCREEN_WIDTH)) - (_finger[port][i].lastDownX * static_cast<float>(TOUCHSCREEN_WIDTH)));
+					float yrel = ((event->tfinger.y * static_cast<float>(TOUCHSCREEN_HEIGHT)) - (_finger[port][i].lastDownY * static_cast<float>(TOUCHSCREEN_HEIGHT)));
 					float maxRSquared = (float) (MAX_TAP_MOTION_DISTANCE * MAX_TAP_MOTION_DISTANCE);
 					if ((xrel * xrel + yrel * yrel) < maxRSquared) {
 						if (numFingersDown == 2 || numFingersDown == 1) {
@@ -174,7 +177,7 @@ void TouchEventSource::preprocessFingerUp(SDL_Event *event) {
 								simulatedButton = SDL_BUTTON_LEFT;
 								// need to raise the button later
 								_simulatedClickStartTime[port][0] = event->tfinger.timestamp;
-								if (port == 0 && !ConfMan.getBool("panel_touchpad_mode")) {
+								if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
 									convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 								}
 							}
@@ -188,7 +191,7 @@ void TouchEventSource::preprocessFingerUp(SDL_Event *event) {
 				}
 			} else if (numFingersDown == 1) {
 				// when dragging, and the last finger is lifted, the drag is over
-				if (port == 0 && !ConfMan.getBool("panel_touchpad_mode")) {
+				if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
 					convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 				}
 				Uint8 simulatedButton = 0;
@@ -227,7 +230,7 @@ void TouchEventSource::preprocessFingerMotion(SDL_Event *event) {
 		int xMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowWidth() - 1;
 		int yMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowHeight() - 1;
 
-		if (port == 0 && !ConfMan.getBool("panel_touchpad_mode")) {
+		if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
 			convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 		}	else {
 			// for relative mode, use the pointer speed setting
@@ -318,7 +321,7 @@ void TouchEventSource::preprocessFingerMotion(SDL_Event *event) {
 					// or location of "oldest" finger (front)
 					int mouseDownX = _mouseX;
 					int mouseDownY = _mouseY;
-					if (port == 0 && !ConfMan.getBool("panel_touchpad_mode")) {
+					if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
 						for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 							if (_finger[port][i].id == id) {
 								Uint32 earliestTime = _finger[port][i].timeLastDown;
@@ -429,4 +432,5 @@ void TouchEventSource::finishSimulatedMouseClicks() {
 		}
 	}
 }
+
 #endif

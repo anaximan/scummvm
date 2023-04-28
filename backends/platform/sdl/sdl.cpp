@@ -182,6 +182,9 @@ bool OSystem_SDL::hasFeature(Feature f) {
 	if (f == kFeatureJoystickDeadzone || f == kFeatureKbdMouseSpeed) {
 		return _eventSource->isJoystickConnected();
 	}
+#if defined(USE_TOUCHSCREEN)
+    if (f == kFeatureTouchpadMode) return true;
+#endif
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
 	/* Even if we are using the 2D graphics manager,
 	 * we are at one initGraphics3d call of supporting OpenGL */
