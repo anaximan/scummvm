@@ -46,7 +46,7 @@ VirtualMouse::VirtualMouse(EventDispatcher *eventDispatcher) :
 	ConfMan.registerDefault("joystick_deadzone", 3);
 
 #if defined(USE_TOUCHSCREEN)
-    ConfMan.registerDefault("panel_touchpad_mode", false);
+	ConfMan.registerDefault("touchpad_mouse_mode", true);
 #endif
 
 	_eventDispatcher->registerSource(this, false);

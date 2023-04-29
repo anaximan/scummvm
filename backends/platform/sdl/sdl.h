@@ -36,10 +36,6 @@
 class DiscordPresence;
 #endif
 
-#if defined(USE_TOUCHSCREEN)
-#include "backends/events/touchsdl/touchsdl-events.h"
-#endif
-
 /**
  * Base OSystem class for all SDL ports.
  */
@@ -56,6 +52,10 @@ public:
 	void init() override;
 
 	bool hasFeature(Feature f) override;
+#if defined(USE_TOUCHSCREEN)
+	void setFeatureState(Feature f, bool enable) override;
+	bool getFeatureState(Feature f) override;
+#endif
 
 	// Override functions from ModularBackend and OSystem
 	void initBackend() override;

@@ -197,6 +197,29 @@ bool OSystem_SDL::hasFeature(Feature f) {
 	return ModularGraphicsBackend::hasFeature(f);
 }
 
+#if defined(USE_TOUCHSCREEN)
+void OSystem_SDL::setFeatureState(Feature f, bool enable) {
+	switch (f) {
+	case kFeatureTouchpadMode:
+		ConfMan.setBool("touchpad_mouse_mode", enable);
+		break;
+	default:
+		ModularGraphicsBackend::setFeatureState(f, enable);
+		break;
+	}
+}
+bool OSystem_SDL::getFeatureState(Feature f) {
+	switch (f) {
+	case kFeatureTouchpadMode:
+		return ConfMan.getBool("touchpad_mouse_mode");
+		break;
+	default:
+		return ModularGraphicsBackend::getFeatureState(f);
+		break;
+	}
+}
+#endif
+
 void OSystem_SDL::initBackend() {
 	// Check if backend has not been initialized
 	assert(!_inited);

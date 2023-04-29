@@ -26,7 +26,7 @@
 #include "backends/events/sdl/sdl-events.h"
 
 // TODO - Autodetect these values?
-#define SCE_TOUCH_PORT_MAX_NUM 1
+#define SCE_TOUCH_PORT_MAX_NUM 16
 #define TOUCHSCREEN_WIDTH 640
 #define TOUCHSCREEN_HEIGHT 480
 

@@ -58,6 +58,8 @@ TouchEventSource::TouchEventSource() {
 	_hiresDX = 0;
 	_hiresDY = 0;
 
+	debug("TouchEventSource: Init\n");
+
 #if SDL_VERSION_ATLEAST(2,0,10)
 	// ensure that touch doesn't create double-events
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
@@ -79,11 +81,11 @@ void TouchEventSource::preprocessEvents(SDL_Event *event) {
 	if (event->type == SDL_FINGERDOWN || event->type == SDL_FINGERUP || event->type == SDL_FINGERMOTION) {
 		// front (0) or back (1) panel
 		SDL_TouchID port = event->tfinger.touchId;
+		int p = port;
 		if (port < SCE_TOUCH_PORT_MAX_NUM && port >= 0) {
-			// touchpad_mouse_mode off: use only front panel for direct touch control of pointer
-			// touchpad_mouse_mode on: also enable rear touch with indirect touch control
-			// where the finger can be somewhere else than the pointer and still move it
-			if (port == 0 || ConfMan.getBool("touchpad_mouse_mode")) {
+			// Allow touch input with or without touchpad mode
+			//if (port == 0 || ConfMan.getBool("touchpad_mouse_mode")) {
+			if (true) {
 				switch (event->type) {
 				case SDL_FINGERDOWN:
 					preprocessFingerDown(event);
@@ -109,7 +111,7 @@ void TouchEventSource::preprocessFingerDown(SDL_Event *event) {
 	int x = _mouseX;
 	int y = _mouseY;
 
-	if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
+	if (!ConfMan.getBool("touchpad_mouse_mode")) {
 		convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 	}
 
@@ -174,7 +176,7 @@ void TouchEventSource::preprocessFingerUp(SDL_Event *event) {
 								simulatedButton = SDL_BUTTON_LEFT;
 								// need to raise the button later
 								_simulatedClickStartTime[port][0] = event->tfinger.timestamp;
-								if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
+								if (!ConfMan.getBool("touchpad_mouse_mode")) {
 									convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 								}
 							}
@@ -188,7 +190,7 @@ void TouchEventSource::preprocessFingerUp(SDL_Event *event) {
 				}
 			} else if (numFingersDown == 1) {
 				// when dragging, and the last finger is lifted, the drag is over
-				if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
+				if (!ConfMan.getBool("touchpad_mouse_mode")) {
 					convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 				}
 				Uint8 simulatedButton = 0;
@@ -227,7 +229,7 @@ void TouchEventSource::preprocessFingerMotion(SDL_Event *event) {
 		int xMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowWidth() - 1;
 		int yMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowHeight() - 1;
 
-		if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
+		if (!ConfMan.getBool("touchpad_mouse_mode")) {
 			convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
 		}	else {
 			// for relative mode, use the pointer speed setting
@@ -318,7 +320,7 @@ void TouchEventSource::preprocessFingerMotion(SDL_Event *event) {
 					// or location of "oldest" finger (front)
 					int mouseDownX = _mouseX;
 					int mouseDownY = _mouseY;
-					if (port == 0 && !ConfMan.getBool("touchpad_mouse_mode")) {
+					if (!ConfMan.getBool("touchpad_mouse_mode")) {
 						for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 							if (_finger[port][i].id == id) {
 								Uint32 earliestTime = _finger[port][i].timeLastDown;
