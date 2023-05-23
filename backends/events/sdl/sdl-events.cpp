@@ -1095,12 +1095,11 @@ uint32 SdlEventSource::obtainUnicode(const SDL_Keysym keySym) {
 #if defined(USE_SDL_TS_VMOUSE)
 void SdlEventSource::_touchInitialize()
 {
-    WindowedGraphicsManager *gm = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager);
-    _touchWindowWidth = gm->getWindowHeight();
-    _touchWindowHeight = gm->getWindowWidth();
-    // Use the same resolution for the touch panel - SDL translates their coordinates
-    _touchPanelWidth = _touchWindowWidth;
-    _touchPanelHeight = _touchWindowHeight;
+    // TODO - Start with a temporary window size before getting true values
+    _touchWindowWidth = 256;
+    _touchWindowHeight = 256;
+    _touchPanelWidth = 256;
+    _touchPanelHeight = 256;
 
     // TODO - Temporary default values - Add to configuration?
     _touchMaxTapTime = 250;
@@ -1145,6 +1144,15 @@ void SdlEventSource::_touchPreprocessEvent(SDL_Event *event)
         event->type == SDL_FINGERUP || 
         event->type == SDL_FINGERMOTION) {
 
+        // Update window size if available
+        WindowedGraphicsManager *gm = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager);
+        if (gm) {
+            _touchPanelWidth = gm->getWidth();
+            _touchPanelHeight = gm->getHeight();
+            _touchWindowWidth = gm->getWindowWidth();
+            _touchWindowHeight = gm->getWindowHeight();
+        }
+
         // Several ports can be available - e.g. PS Vita has front and back
         SDL_TouchID port = event->tfinger.touchId;
 
@@ -1184,9 +1192,6 @@ void SdlEventSource::_touchPreprocessFingerDown(SDL_Event *event)
         }
     }
 
-    // we need the timestamps to decide later if the user performed a short tap (click)
-    // or a long tap (drag)
-    // we also need the last coordinates for each finger to keep track of dragging
     // Remember touch-down position for later processing
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
         if (_touchFingers[port][iii].id == -1) {
@@ -1230,6 +1235,12 @@ void SdlEventSource::_touchPreprocessFingerUp(SDL_Event *event)
                 int32_t tdDeltaY = posY - _touchFingers[port][iii].tdPosY;
                 uint32_t sqTdDistance = (tdDeltaX * tdDeltaX) + (tdDeltaY * tdDeltaY);
 
+                if (ConfMan.getBool("touchpad_mouse_mode")) {
+                    // Touchpad mode -> Use current mouse position
+                    posX = _mouseX;
+                    posY = _mouseY;
+                }
+
                 if (timeDelta <= static_cast<int32_t>(_touchMaxTapTime) && 
                     sqTdDistance <= _touchMaxTapSqDist) {
                     // Short tap -> Mouse click
@@ -1261,6 +1272,13 @@ void SdlEventSource::_touchPreprocessFingerUp(SDL_Event *event)
                 // Two-finger drag
                 if (touchCount == 1) {
                     // Ending drag
+                    
+                    if (ConfMan.getBool("touchpad_mouse_mode")) {
+                        // Touchpad mode -> Use current mouse position
+                        posX = _mouseX;
+                        posY = _mouseY;
+                    }
+
                     event->type = SDL_MOUSEBUTTONUP;
                     event->button.button = SDL_BUTTON_LEFT;
                     event->button.x = posX;
@@ -1273,6 +1291,13 @@ void SdlEventSource::_touchPreprocessFingerUp(SDL_Event *event)
                 // Three-finger drag
                 if (touchCount == 1) {
                     // Ending drag
+                    
+                    if (ConfMan.getBool("touchpad_mouse_mode")) {
+                        // Touchpad mode -> Use current mouse position
+                        posX = _mouseX;
+                        posY = _mouseY;
+                    }
+
                     event->type = SDL_MOUSEBUTTONUP;
                     event->button.button = SDL_BUTTON_RIGHT;
                     event->button.x = posX;
@@ -1323,105 +1348,109 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
         }
     }
 
-    if (touchCount >= 1) {
+    // No touch -> No reaction
+    if (touchCount < 1) 
+    { return; }
+
+    if (ConfMan.getBool("touchpad_mouse_mode")) {
+        // Position the cursor using a virtual touchpad
+        // Get speed factor from settings
+        float speedFactor = touchGetSpeedFactor(ConfMan.getInt("kbdmouse_speed"));;
+        // Add relative movement since the last sync
+        _touchHighResDX += (event->tfinger.dx * 
+            1.25f * speedFactor * _touchPrecisionMult *
+            (_touchWindowWidth - 1));
+        _touchHighResDY += (event->tfinger.dy * 
+            1.25f * speedFactor * _touchPrecisionMult * 
+            (_touchWindowHeight - 1));
+
+        // Calculate integral deltas
+        int32_t dx = _touchHighResDX / static_cast<int32_t>(_touchPrecisionMult);
+        int32_t dy = _touchHighResDY / static_cast<int32_t>(_touchPrecisionMult);
+        // Remove the integral part from the high resolution accumulator
+        _touchHighResDX %= static_cast<int32_t>(_touchPrecisionMult);
+        _touchHighResDY %= static_cast<int32_t>(_touchPrecisionMult);
+
+        // Use these position to place the cursor
+        posX = _mouseX + dx;
+        posY = _mouseY + dy;
+    } else {
+        // No operation needed, use touch position for the cursor
+    }
+
+    // Clipping x to <0, width - 1>
+    if (posX >= static_cast<int32_t>(_touchWindowWidth)) {
+        posX = _touchWindowWidth - 1;
+    } else if (posX < 0) {
+        posX = 0;
+    }
+    // Clipping y to <0, height - 1>
+    if (posY >= static_cast<int32_t>(_touchWindowHeight)) {
+        posY = _touchWindowHeight - 1;
+    } else if (posY < 0) {
+        posY = 0;
+    }
+
+    // Count number of long-holding touches
+    uint32_t longTouchCount = 0;
+    // Also find the longest-running touch
+    int32_t longestTd = 0;
+    uint32_t longestTdIdx = 0;
+    for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
+        if (_touchFingers[port][iii].id >= 0) {
+            int32_t timeDelta = event->tfinger.timestamp - _touchFingers[port][iii].tdTime;
+            if (timeDelta > longestTd)
+            { longestTd = timeDelta; longestTdIdx = iii; }
+            if (timeDelta > static_cast<int32_t>(_touchMaxTapTime))
+            { longTouchCount++; }
+        }
+    }
+
+    // Starting a new multi-finger drag?
+    if (longTouchCount >= 2 && _touchDragType[port] == TOUCH_DRAG_NONE) {
+        // If there are enough of them -> Start the drag
+        // Anchor position represents the cursor under dragging action
+        int32_t anchorX = _mouseX;
+        int32_t anchorY = _mouseY;
         if (ConfMan.getBool("touchpad_mouse_mode")) {
-            // Position the cursor using a virtual touchpad
-            // Get speed factor from settings
-            float speedFactor = touchGetSpeedFactor(ConfMan.getInt("kbdmouse_speed"));;
-            // Add relative movement since the last sync
-            _touchHighResDX += (event->tfinger.dx * 
-                1.25f * speedFactor * _touchPrecisionMult *
-                (_touchWindowWidth - 1));
-            _touchHighResDY += (event->tfinger.dy * 
-                1.25f * speedFactor * _touchPrecisionMult * 
-                (_touchWindowHeight - 1));
-
-            // Calculate integral deltas
-            int32_t dx = _touchHighResDX / _touchPrecisionMult;
-            int32_t dy = _touchHighResDY / _touchPrecisionMult;
-            // Remove the integral part from the high resolution accumulator
-            _touchHighResDX %= _touchPrecisionMult;
-            _touchHighResDY %= _touchPrecisionMult;
-
-            // Use these position to place the cursor
-            posX = _mouseX + dx;
-            posX = _mouseY + dy;
+            // For touchpad control, this is the current cursor position
+            anchorX = _mouseX;
+            anchorY = _mouseY;
+        } else {
+            // For direct mode, locate the oldest active touch -> the anchor
+            anchorX = _touchFingers[port][longestTdIdx].posX;
+            anchorX = _touchFingers[port][longestTdIdx].posY;
         }
 
-        // Clipping x to <0, width - 1>
-        if (posX >= static_cast<int32_t>(_touchWindowWidth)) {
-            posX = _touchWindowWidth - 1;
-        } else if (posX < 0) {
-            posX = 0;
-        }
-        // Clipping y to <0, height - 1>
-        if (posY >= static_cast<int32_t>(_touchWindowHeight)) {
-            posY = _touchWindowHeight - 1;
-        } else if (posY < 0) {
-            posY = 0;
-        }
-
-        // Count number of long-holding touches
-        uint32_t longTouchCount = 0;
-        // Also find the longest-running touch
-        int32_t longestTd = 0;
-        uint32_t longestTdIdx = 0;
-        for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
-            if (_touchFingers[port][iii].id >= 0) {
-                int32_t timeDelta = event->tfinger.timestamp - _touchFingers[port][iii].tdTime;
-                if (timeDelta > longestTd)
-                { longestTd = timeDelta; longestTdIdx = iii; }
-                if (timeDelta > static_cast<int32_t>(_touchMaxTapTime))
-                { longTouchCount++; }
-            }
+        // Generate a new event.
+        SDL_Event newEvent;
+        switch (longTouchCount) {
+            default:
+            case 2:
+            { // Two-finger drag -> Left mouse drag
+                newEvent.type = SDL_MOUSEBUTTONDOWN;
+                newEvent.button.button = SDL_BUTTON_LEFT;
+                newEvent.button.x = anchorX;
+                newEvent.button.y = anchorY;
+            } break;
+            case 3: 
+            { // Three-finger drag -> Right mouse drag
+                newEvent.type = SDL_MOUSEBUTTONDOWN;
+                newEvent.button.button = SDL_BUTTON_RIGHT;
+                newEvent.button.x = anchorX;
+                newEvent.button.y = anchorY;
+            } break;
         }
 
-        // Starting a new multi-finger drag?
-        if (longTouchCount >= 2 && _touchDragType[port] == TOUCH_DRAG_NONE) {
-            // If there are enough of them -> Start the drag
-            // Anchor position represents the cursor under dragging action
-            int32_t anchorX = _mouseX;
-            int32_t anchorY = _mouseY;
-            if (ConfMan.getBool("touchpad_mouse_mode")) {
-                // For touchpad control, this is the current cursor position
-                anchorX = _mouseX;
-                anchorY = _mouseY;
-            } else {
-                // For direct mode, locate the oldest active touch -> the anchor
-                anchorX = _touchFingers[port][longestTdIdx].posX;
-                anchorX = _touchFingers[port][longestTdIdx].posY;
-            }
+        /// Place the event into the queue for further processing
+        SDL_PushEvent(&newEvent);
+    } // longTouchCount >= 2 && _touchDragType[port] == TOUCH_DRAG_NONE
 
-            // Generate a new event.
-            SDL_Event newEvent;
-            switch (longTouchCount) {
-                default:
-                case 2:
-                { // Two-finger drag -> Left mouse drag
-                    newEvent.type = SDL_MOUSEBUTTONDOWN;
-                    newEvent.button.button = SDL_BUTTON_LEFT;
-                    newEvent.button.x = anchorX;
-                    newEvent.button.y = anchorY;
-                } break;
-                case 3: 
-                { // Three-finger drag -> Right mouse drag
-                    newEvent.type = SDL_MOUSEBUTTONDOWN;
-                    newEvent.button.button = SDL_BUTTON_RIGHT;
-                    newEvent.button.x = anchorX;
-                    newEvent.button.y = anchorY;
-                } break;
-            }
-
-            /// Place the event into the queue for further processing
-            SDL_PushEvent(&newEvent);
-        } // longTouchCount >= 2
-
-        // Update the cursor only when moving the original anchor touch
-        if (longestTdIdx == currentTdIdx) {
-            event->type = SDL_MOUSEMOTION;
-            event->motion.x = posX;
-            event->motion.y = posY;
-        }
+    // Update the cursor only when moving the original anchor touch
+    if (longestTdIdx == currentTdIdx) {
+        event->type = SDL_MOUSEMOTION;
+        event->motion.x = posX;
+        event->motion.y = posY;
     }
 }
 
@@ -1429,18 +1458,34 @@ void SdlEventSource::_touchConvertPanelToWindow(
     float panelX, float panelY, 
     int32_t &winX, int32_t &winY)
 {
-    // Convert from <0, 1> -> <0, width>
-    winX = static_cast<int32_t>(panelX * _touchWindowWidth);
+    // TODO - Cleanup, simplify and describe this part
+    // Essentially, it takes touch panel pixel coordinates 
+    // and transforms them into ScummVM window coordinates
+    // Most of the values could be pre-computed every time 
+    // resolution changes...
+
+	float ratio = static_cast<float>(_touchWindowWidth) / static_cast<float>(_touchWindowHeight);
+
+	int32_t ratioHeight = _touchPanelHeight;
+	int32_t ratioWidth = _touchPanelHeight * ratio;
+
+    int32_t offsetX = (_touchPanelWidth - ratioWidth) / 2;
+    int32_t offsetY = (_touchPanelHeight - ratioHeight) / 2;
+
+	float scaleX = static_cast<float>(ratioWidth) / static_cast<float>(_touchWindowWidth);
+	float scaleY = static_cast<float>(ratioHeight) / static_cast<float>(_touchWindowHeight);
+
+    float absPanelX = panelX * static_cast<float>(_touchPanelWidth);
+    float absPanelY = panelY * static_cast<float>(_touchPanelHeight);
+
+	winX = static_cast<int32_t>((absPanelX - offsetX) / scaleX);
+	winY = static_cast<int32_t>((absPanelY - offsetY) / scaleY);
 
     // Clip to <0, width)
     if (winX >= static_cast<int32_t>(_touchWindowWidth))
     { winX = _touchWindowWidth - 1; } 
     else if (winX < 0)
     { winX = 0; }
-
-    // Convert from <0, 1> -> <0, height>
-    winY = static_cast<int32_t>(panelY * _touchWindowHeight);
-
     // Clip to <0, height)
     if (winY >= static_cast<int32_t>(_touchWindowHeight))
     { winY = _touchWindowHeight - 1; } 
