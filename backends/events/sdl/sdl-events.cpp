@@ -786,7 +786,7 @@ void SdlEventSource::closeJoystick() {
 	}
 }
 
-void SdlEventSource:preprocessEvents(SDL_Event *event)
+void SdlEventSource::preprocessEvents(SDL_Event *event)
 {
 #if defined(USE_SDL_TS_VMOUSE)
     _touchPreprocessEvent(event);
@@ -1151,30 +1151,19 @@ void SdlEventSource::_touchPreprocessEvent(SDL_Event *event)
         if (port < TOUCH_MAX_PORTS && port >= 0) {
             switch (event->type) {
                 case SDL_FINGERDOWN:
+                {
                     _touchPreprocessFingerDown(event);
-                    break;
+                } break;
                 case SDL_FINGERUP:
+                {
                     _touchPreprocessFingerUp(event);
-                    break;
+                } break;
                 case SDL_FINGERMOTION:
+                {
                     _touchPreprocessFingerMotion(event);
-                    break;
+                } break;
             }
         }
-    }
-}
-
-/// Convert virtual touch mouse button (TOUCH_BUTTON_*) to its SDL equivalent (SDL_BUTTON_*)
-uint8_t touch_mouse_button_to_sdl(TouchMouseButton btn)
-{
-    switch (btn)
-    {
-        case TOUCH_BUTTON_LEFT:
-            reuturn SDL_BUTTON_LEFT;
-        case TOUCH_BUTTON_RIGHT:
-            reuturn SDL_BUTTON_RIGHT;
-        default:
-            return 0;
     }
 }
 
@@ -1189,9 +1178,9 @@ void SdlEventSource::_touchPreprocessFingerDown(SDL_Event *event)
     _touchConvertPanelToWindow(event->tfinger.x, event->tfinger.y, posX, posY);
 
     // Make sure each finger is not reported down multiple times
-    for (uint32_t iii = 0u; i < TOUCH_MAX_POINTS; ++iii) {
-        if (_touchFinger[port][iii].id == id) {
-            _touchFinger[port][iii].id = -1;
+    for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
+        if (_touchFingers[port][iii].id == id) {
+            _touchFingers[port][iii].id = -1;
         }
     }
 
@@ -1200,14 +1189,14 @@ void SdlEventSource::_touchPreprocessFingerDown(SDL_Event *event)
     // we also need the last coordinates for each finger to keep track of dragging
     // Remember touch-down position for later processing
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
-        if (_touchFinger[port][iii].id == -1) {
+        if (_touchFingers[port][iii].id == -1) {
             // TODO - Storing ID this way is inefficient, we need to search for it later
-            _touchFinger[port][iii].id = id;
-            _touchFinger[port][iii].posX = posX;
-            _touchFinger[port][iii].posY = posY;
-            _touchFinger[port][iii].tdTime = event->tfinger.timestamp;
-            _touchFinger[port][iii].tdPosX = posX;
-            _touchFinger[port][iii].tdPosY = posY;
+            _touchFingers[port][iii].id = id;
+            _touchFingers[port][iii].posX = posX;
+            _touchFingers[port][iii].posY = posY;
+            _touchFingers[port][iii].tdTime = event->tfinger.timestamp;
+            _touchFingers[port][iii].tdPosX = posX;
+            _touchFingers[port][iii].tdPosY = posY;
             break;
         }
     }
@@ -1219,9 +1208,9 @@ void SdlEventSource::_touchPreprocessFingerUp(SDL_Event *event)
     SDL_FingerID id = event->tfinger.fingerId;
 
     // Get touch count for gesture detection
-    uint32_t touchCount;
+    uint32_t touchCount = 0u;
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) 
-    { if (_touchFinger[port][iii].id >= 0) { touchCount++; } }
+    { if (_touchFingers[port][iii].id >= 0) { touchCount++; } }
 
     // Get pixel coordinates of the touch point
     int32_t posX = 0;
@@ -1229,67 +1218,69 @@ void SdlEventSource::_touchPreprocessFingerUp(SDL_Event *event)
     _touchConvertPanelToWindow(event->tfinger.x, event->tfinger.y, posX, posY);
 
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
-        if (_touchFinger[port][iii].id != id) 
+        if (_touchFingers[port][iii].id != id) 
         { continue; }
-        _touchFinger[port][iii].id = -1;
+        _touchFingers[port][iii].id = -1;
         switch (_touchDragType[port]) {
             case TOUCH_DRAG_NONE:
-                // No drag in progress
+            { // No drag in progress
                 int32_t timeDelta = event->tfinger.timestamp - 
-                    _touchFinger[port][iii].timeLastDown;
+                    _touchFingers[port][iii].tdTime;
                 int32_t tdDeltaX = posX - _touchFingers[port][iii].tdPosX;
                 int32_t tdDeltaY = posY - _touchFingers[port][iii].tdPosY;
-                int32_t sqTdDistance = (tdDeltaX * tdDeltaX) + (tdDeltaY * tdDeltaY);
+                uint32_t sqTdDistance = (tdDeltaX * tdDeltaX) + (tdDeltaY * tdDeltaY);
 
-                if (timeDelta <= _touchMaxTapTime && sqTdDistance <= _touchMaxTapSqDist) {
+                if (timeDelta <= static_cast<int32_t>(_touchMaxTapTime) && 
+                    sqTdDistance <= _touchMaxTapSqDist) {
                     // Short tap -> Mouse click
-                    switch (touchCount)
-                    {
+                    switch (touchCount) {
                         case 1:
-                            // One touch point -> Left Click
+                        { // One touch point -> Left Click
                             event->type = SDL_MOUSEBUTTONDOWN;
-                            event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_LEFT);
+                            event->button.button = SDL_BUTTON_LEFT;
                             event->button.x = posX;
                             event->button.y = posY;
                             _touchClickTime[port][TOUCH_BUTTON_LEFT] = event->tfinger.timestamp;
-                            break;
+                        } break;
                         case 2:
-                            // Two touch points -> Right Click
+                        { // Two touch points -> Right Click
                             event->type = SDL_MOUSEBUTTONDOWN;
-                            event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_RIGHT);
+                            event->button.button = SDL_BUTTON_RIGHT;
                             event->button.x = posX;
                             event->button.y = posY;
                             _touchClickTime[port][TOUCH_BUTTON_RIGHT] = event->tfinger.timestamp;
-                            break;
-                         // TODO - Can add more gestures here...
-                         default:
+                        } break;
+                        // TODO - Can add more gestures here...
+                        default:
                             break;
                     }
                 }
-                break;
+            } break;
             case TOUCH_DRAG_TWO: 
+            {
                 // Two-finger drag
                 if (touchCount == 1) {
                     // Ending drag
                     event->type = SDL_MOUSEBUTTONUP;
-                    event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_LEFT);
+                    event->button.button = SDL_BUTTON_LEFT;
                     event->button.x = posX;
                     event->button.y = posY;
                     _touchDragType[port] = TOUCH_DRAG_NONE;
                 }
-                break;
+            } break;
             case TOUCH_DRAG_THREE: 
+            {
                 // Three-finger drag
                 if (touchCount == 1) {
                     // Ending drag
                     event->type = SDL_MOUSEBUTTONUP;
-                    event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_RIGHT);
+                    event->button.button = SDL_BUTTON_RIGHT;
                     event->button.x = posX;
                     event->button.y = posY;
                     _touchDragType[port] = TOUCH_DRAG_NONE;
                 }
-                break;
-             default:
+            } break;
+            default:
                 break;
         }
     }
@@ -1300,7 +1291,7 @@ static float touchGetSpeedFactor(uint32_t mouseSpeed)
 {
     // TODO - The table can be modified, otherwise simple interpolation would suffice
     static constexpr float speedFactorTable[] = 
-    { 0.25, 0.5, 0.75, 1.0, 1.25, 1.5. 1.75, 2.0 }
+    { 0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f };
     static constexpr size_t speedFactorCount = 
         sizeof(speedFactorTable) / sizeof(speedFactorTable[0]);
     return mouseSpeed < speedFactorCount ? speedFactorTable[mouseSpeed] : 1.0;
@@ -1312,9 +1303,9 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
     SDL_FingerID id = event->tfinger.fingerId;
 
     // Get touch count for gesture detection
-    uint32_t touchCount;
+    uint32_t touchCount = 0u;
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) 
-    { if (_touchFinger[port][iii].id >= 0) { touchCount++; } }
+    { if (_touchFingers[port][iii].id >= 0) { touchCount++; } }
 
     // Get pixel coordinates of the touch point
     int32_t posX = 0;
@@ -1325,9 +1316,9 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
     uint32_t currentTdIdx = 0;
     // Update touch point tracking position
     for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
-        if (_touchFinger[port][iii].id == id) {
-            _touchFinger[port][iii].posX = posX;
-            _touchFinger[port][iii].posY = posY;
+        if (_touchFingers[port][iii].id == id) {
+            _touchFingers[port][iii].posX = posX;
+            _touchFingers[port][iii].posY = posY;
             currentTdIdx = iii;
         }
     }
@@ -1358,13 +1349,13 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
         }
 
         // Clipping x to <0, width - 1>
-        if (posX >= _touchWindowWidth) {
+        if (posX >= static_cast<int32_t>(_touchWindowWidth)) {
             posX = _touchWindowWidth - 1;
         } else if (posX < 0) {
             posX = 0;
         }
         // Clipping y to <0, height - 1>
-        if (posY >= _touchWindowHeight) {
+        if (posY >= static_cast<int32_t>(_touchWindowHeight)) {
             posY = _touchWindowHeight - 1;
         } else if (posY < 0) {
             posY = 0;
@@ -1376,11 +1367,11 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
         int32_t longestTd = 0;
         uint32_t longestTdIdx = 0;
         for (uint32_t iii = 0u; iii < TOUCH_MAX_POINTS; ++iii) {
-            if (_touchFinger[port][iii].id >= 0) {
-                int32_t timeDelta = event->tfinger.timestamp - _touchFinger[port][iii].tdTime;
+            if (_touchFingers[port][iii].id >= 0) {
+                int32_t timeDelta = event->tfinger.timestamp - _touchFingers[port][iii].tdTime;
                 if (timeDelta > longestTd)
                 { longestTd = timeDelta; longestTdIdx = iii; }
-                if (timeDelta > _touchMaxTapTime)
+                if (timeDelta > static_cast<int32_t>(_touchMaxTapTime))
                 { longTouchCount++; }
             }
         }
@@ -1393,44 +1384,43 @@ void SdlEventSource::_touchPreprocessFingerMotion(SDL_Event *event)
             int32_t anchorY = _mouseY;
             if (ConfMan.getBool("touchpad_mouse_mode")) {
                 // For touchpad control, this is the current cursor position
-                enchorX = _mouseX;
+                anchorX = _mouseX;
                 anchorY = _mouseY;
             } else {
                 // For direct mode, locate the oldest active touch -> the anchor
-                anchorX = _touchFinger[port][longestTdIdx].posX;
-                anchorX = _touchFinger[port][longestTdIdx].posY;
+                anchorX = _touchFingers[port][longestTdIdx].posX;
+                anchorX = _touchFingers[port][longestTdIdx].posY;
             }
 
             // Generate a new event.
-            SDL_Event event;
-            switch (longTouchCount)
-            {
+            SDL_Event newEvent;
+            switch (longTouchCount) {
                 default:
                 case 2:
-                    // Two-finger drag -> Left mouse drag
-                    event.type = SDL_MOUSEBUTTONDOWN;
-                    event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_LEFT);
-                    event.button.x = anchorX;
-                    event.button.y = anchorY;
-                    break;
+                { // Two-finger drag -> Left mouse drag
+                    newEvent.type = SDL_MOUSEBUTTONDOWN;
+                    newEvent.button.button = SDL_BUTTON_LEFT;
+                    newEvent.button.x = anchorX;
+                    newEvent.button.y = anchorY;
+                } break;
                 case 3: 
-                    // Three-finger drag -> Right mouse drag
-                    event.type = SDL_MOUSEBUTTONDOWN;
-                    event->button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_RIGHT);
-                    event.button.x = anchorX;
-                    event.button.y = anchorY;
-                    break;
+                { // Three-finger drag -> Right mouse drag
+                    newEvent.type = SDL_MOUSEBUTTONDOWN;
+                    newEvent.button.button = SDL_BUTTON_RIGHT;
+                    newEvent.button.x = anchorX;
+                    newEvent.button.y = anchorY;
+                } break;
             }
 
-            /// Place the event into the que for further processing
-            SDL_PushEvent(&event);
+            /// Place the event into the queue for further processing
+            SDL_PushEvent(&newEvent);
         } // longTouchCount >= 2
 
         // Update the cursor only when moving the original anchor touch
         if (longestTdIdx == currentTdIdx) {
             event->type = SDL_MOUSEMOTION;
-            event->motion.x = x;
-            event->motion.y = y;
+            event->motion.x = posX;
+            event->motion.y = posY;
         }
     }
 }
@@ -1439,8 +1429,23 @@ void SdlEventSource::_touchConvertPanelToWindow(
     float panelX, float panelY, 
     int32_t &winX, int32_t &winY)
 {
-    winX = CLIP(static_cast<int32_t>(panelX * _touchWindowWidth), 0, _touchWidowWidth);
-    winY = CLIP(static_cast<int32_t>(panelY * _touchWindowHeight), 0, _touchWidowHeight);
+    // Convert from <0, 1> -> <0, width>
+    winX = static_cast<int32_t>(panelX * _touchWindowWidth);
+
+    // Clip to <0, width)
+    if (winX >= static_cast<int32_t>(_touchWindowWidth))
+    { winX = _touchWindowWidth - 1; } 
+    else if (winX < 0)
+    { winX = 0; }
+
+    // Convert from <0, 1> -> <0, height>
+    winY = static_cast<int32_t>(panelY * _touchWindowHeight);
+
+    // Clip to <0, height)
+    if (winY >= static_cast<int32_t>(_touchWindowHeight))
+    { winY = _touchWindowHeight - 1; } 
+    else if (winY < 0)
+    { winY = 0; }
 }
 
 void SdlEventSource::_touchPeriodicUpdate()
@@ -1459,12 +1464,12 @@ void SdlEventSource::_touchPeriodicUpdate()
             { continue; }
 
             // Click held long enough -> Release
-            SDLEvent event;
-            event.type = SDL_MOUSEBUTTONUP;
-            event.button.button = touch_mouse_button_to_sdl(TOUCH_BUTTON_LEFT);
-            event.button.x = _mouseX;
-            event.button.y = _mouseY;
-            SDL_PushEvent(&event);
+            SDL_Event newEvent;
+            newEvent.type = SDL_MOUSEBUTTONUP;
+            newEvent.button.button = SDL_BUTTON_LEFT;
+            newEvent.button.x = _mouseX;
+            newEvent.button.y = _mouseY;
+            SDL_PushEvent(&newEvent);
 
             _touchClickTime[iii][btn] = 0u;
         }
