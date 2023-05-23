@@ -45,10 +45,6 @@ VirtualMouse::VirtualMouse(EventDispatcher *eventDispatcher) :
 	ConfMan.registerDefault("kbdmouse_speed", 3);
 	ConfMan.registerDefault("joystick_deadzone", 3);
 
-#if defined(USE_TOUCHSCREEN)
-	ConfMan.registerDefault("touchpad_mouse_mode", true);
-#endif
-
 	_eventDispatcher->registerSource(this, false);
 	_eventDispatcher->registerObserver(this, 10, false);
 }

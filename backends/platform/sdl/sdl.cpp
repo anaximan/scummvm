@@ -41,9 +41,6 @@
 #endif
 
 #include "backends/events/default/default-events.h"
-#if defined(USE_TOUCHSCREEN)
-#include "backends/events/touchsdl/touchsdl-events.h"
-#endif
 #include "backends/events/sdl/legacy-sdl-events.h"
 #include "backends/keymapper/hardware-input.h"
 #include "backends/mutex/sdl/sdl-mutex.h"
@@ -185,7 +182,7 @@ bool OSystem_SDL::hasFeature(Feature f) {
 	if (f == kFeatureJoystickDeadzone || f == kFeatureKbdMouseSpeed) {
 		return _eventSource->isJoystickConnected();
 	}
-#if defined(USE_TOUCHSCREEN)
+#if defined(USE_SDL_TS_VMOUSE)
     if (f == kFeatureTouchpadMode) return true;
 #endif
 #if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
@@ -197,7 +194,7 @@ bool OSystem_SDL::hasFeature(Feature f) {
 	return ModularGraphicsBackend::hasFeature(f);
 }
 
-#if defined(USE_TOUCHSCREEN)
+#if defined(USE_SDL_TS_VMOUSE)
 void OSystem_SDL::setFeatureState(Feature f, bool enable) {
 	switch (f) {
 	case kFeatureTouchpadMode:
@@ -218,7 +215,7 @@ bool OSystem_SDL::getFeatureState(Feature f) {
 		break;
 	}
 }
-#endif
+#endif // defined(USE_SDL_TS_VMOUSE)
 
 void OSystem_SDL::initBackend() {
 	// Check if backend has not been initialized
@@ -250,16 +247,10 @@ void OSystem_SDL::initBackend() {
 	detectAntiAliasingSupport();
 #endif
 
-#if defined(USE_TOUCHSCREEN)
-    // Create the touch event source
-	if (!_eventSource)
-		_eventSource = new TouchEventSource();
-#else
 	// Create the default event source, in case a custom backend
 	// manager didn't provide one yet.
 	if (!_eventSource)
 		_eventSource = new SdlEventSource();
-#endif
 
 #if !SDL_VERSION_ATLEAST(2, 0, 0)
 	// SDL 1 does not generate its own keyboard repeat events.

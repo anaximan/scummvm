@@ -223,7 +223,7 @@ _nuked_opl=yes
 _builtin_resources=yes
 _windows_console=yes
 _windows_unicode=yes
-_sdl_touchscreen=no
+_sdl_ts_vmouse=no
 _cygwin_build=no
 # Default commands
 _ranlib=ranlib
@@ -979,8 +979,8 @@ Optional Features:
   --disable-windows-console do not show console output on Windows
   --enable-windows-unicode  use Windows Unicode APIs (default)
   --disable-windows-unicode use Windows ANSI APIs
-  --enable-sdl-touchscreen  enable SDL touchscreen support
-  --disable-sdl-touchscreen disable SDL touchscreen support
+  --enable-sdl-ts-vmouse   enable SDL touchscreen virtual mouse support
+  --disable-sdl-ts-vmouse  disable SDL touchscreen virtual mouse support
 
 Optional Documentation Options:
   --with-manual-version=VERSION version to use when generating the manual (optional)
@@ -1288,8 +1288,8 @@ for ac_option in $@; do
 	--disable-eventrecorder)     _eventrec=no            ;;
 	--enable-text-console)       _text_console=yes       ;;
 	--disable-text-console)      _text_console=no        ;;
-	--enable-sdl-touchscreen)    _sdl_touchscreen=yes    ;;
-	--disable-sdl-touchscreen)   _sdl_touchscreen=no     ;;
+	--enable-sdl-ts-vmouse)      _sdl_ts_vmouse=yes      ;;
+	--disable-sdl-ts-vmouse)     _sdl_ts_vmouse=no       ;;
 	--with-fluidsynth-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		FLUIDSYNTH_CFLAGS="-I$arg/include"
@@ -5977,8 +5977,8 @@ define_in_config_h_if_yes "$_readline" 'USE_READLINE'
 
 define_in_config_h_if_yes "$_text_console" 'USE_TEXT_CONSOLE_FOR_DEBUGGER'
 
-define_in_config_h_if_yes "$_sdl_touchscreen" 'USE_TOUCHSCREEN'
-define_in_config_if_yes "$_sdl_touchscreen" 'USE_TOUCHSCREEN'
+define_in_config_h_if_yes "$_sdl_ts_vmouse" 'USE_SDL_TS_VMOUSE'
+define_in_config_if_yes "$_sdl_ts_vmouse" 'USE_SDL_TS_VMOUSE'
 
 #
 # Check for Unity if taskbar integration is enabled

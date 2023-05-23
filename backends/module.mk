@@ -284,11 +284,6 @@ endif
 
 endif
 
-ifdef USE_TOUCHSCREEN 
-MODULE_OBJS += \
-	events/touchsdl/touchsdl-events.o
-endif
-
 ifeq ($(BACKEND),3ds)
 MODULE_OBJS += \
 	mutex/3ds/3ds-mutex.o
